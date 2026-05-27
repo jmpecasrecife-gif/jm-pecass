@@ -462,6 +462,8 @@ async function loadVehicles() {
     if (!match) throw new Error('JSON não encontrado na resposta');
     const data = JSON.parse(match[0]);
 
+    const BASE = 'https://jmpecasrecife-gif.github.io/jm-pecass/';
+
     const vehicles = (data.veiculos || []).map(v => ({
       title:        v.titulo        || '',
       price:        v.preco         || 0,
@@ -470,7 +472,9 @@ async function loadVehicles() {
       fuel:         v.combustivel   || 'Flex',
       transmission: v.cambio        || 'Automático',
       description:  v.descricao     || '',
-      images:       v.imagens       || [],
+      images:       (v.imagens || []).map(img =>
+        img.startsWith('http') ? img : BASE + img
+      ),
       url:          v.url_olx       || '#',
     }));
 
