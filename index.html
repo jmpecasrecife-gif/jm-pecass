@@ -443,8 +443,8 @@ function buildCarCard(v, index) {
     </div>`;
 }
 
-// ── Fetch do Apps Script via JSONP (evita bloqueio de redirect CORS) ─
-function loadVehicles() {
+// ── Carrega veículos do Apps Script ──────────────────────
+async function loadVehicles() {
   const container = document.getElementById('cars-container');
 
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'COLE_AQUI_A_URL_DO_APPS_SCRIPT') {
@@ -452,16 +452,15 @@ function loadVehicles() {
     return;
   }
 
-  // Timeout de 8 segundos
-  const timeout = setTimeout(() => {
-    container.innerHTML = `<div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
-      ⚠️ Não foi possível carregar os veículos agora. <a href="https://api.whatsapp.com/send?phone=5581997821413" target="_blank" style="color:#38bdf8">Entre em contato pelo WhatsApp.</a>
-    </div>`;
-  }, 8000);
+  try {
+    // A URL final após redirects é script.googleusercontent.com que tem CORS *
+    const res  = await fetch(APPS_SCRIPT_URL, { redirect: 'follow' });
+    const text = await res.text();
 
-  // Callback global chamado pelo script injetado
-  window.__jmCallback = function(data) {
-    clearTimeout(timeout);
+    // Remove wrapper JSONP se vier (__jmCallback({...}))
+    const clean = text.replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
+    const data  = JSON.parse(clean);
+
     const vehicles = (data.veiculos || []).map(v => ({
       title:        v.titulo        || '',
       price:        v.preco         || 0,
@@ -480,25 +479,15 @@ function loadVehicles() {
     }
 
     container.innerHTML = vehicles.map((v, i) => buildCarCard(v, i)).join('');
-    vehicles.forEach((v, i) => initSlider('slider' + (i+1), v.images));
-  };
+    vehicles.forEach((v, i) => initSlider('slider' + (i + 1), v.images));
 
-  // Injeta script tag — ignora CORS e redirects
-  const script = document.createElement('script');
-  script.src = APPS_SCRIPT_URL + '?callback=__jmCallback&t=' + Date.now();
-  script.onerror = () => {
-    clearTimeout(timeout);
-    // Fallback: tenta fetch normal
-    fetch(APPS_SCRIPT_URL + '?t=' + Date.now())
-      .then(r => r.json())
-      .then(data => window.__jmCallback(data))
-      .catch(() => {
-        container.innerHTML = `<div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
-          ⚠️ Não foi possível carregar os veículos. <a href="https://api.whatsapp.com/send?phone=5581997821413" target="_blank" style="color:#38bdf8">Fale pelo WhatsApp.</a>
-        </div>`;
-      });
-  };
-  document.head.appendChild(script);
+  } catch (err) {
+    console.error('Erro:', err);
+    container.innerHTML = `
+      <div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
+        ⚠️ Não foi possível carregar os veículos. <a href="https://api.whatsapp.com/send?phone=5581997821413" target="_blank" style="color:#38bdf8">Fale pelo WhatsApp.</a>
+      </div>`;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', loadVehicles);
