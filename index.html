@@ -453,13 +453,14 @@ async function loadVehicles() {
   }
 
   try {
-    // A URL final após redirects é script.googleusercontent.com que tem CORS *
-    const res  = await fetch(APPS_SCRIPT_URL, { redirect: 'follow' });
+    const res = await fetch(APPS_SCRIPT_URL, { redirect: 'follow' });
     const text = await res.text();
+    console.log('Status:', res.status, '| Início:', text.substring(0, 80));
 
-    // Remove wrapper JSONP se vier (__jmCallback({...}))
-    const clean = text.replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
-    const data  = JSON.parse(clean);
+    // Extrai o JSON de dentro do texto (seja JSON puro ou HTML com JSON embutido)
+    const match = text.match(/\{[\s\S]*"veiculos"[\s\S]*\}/);
+    if (!match) throw new Error('JSON não encontrado na resposta');
+    const data = JSON.parse(match[0]);
 
     const vehicles = (data.veiculos || []).map(v => ({
       title:        v.titulo        || '',
@@ -472,6 +473,8 @@ async function loadVehicles() {
       images:       v.imagens       || [],
       url:          v.url_olx       || '#',
     }));
+
+    console.log('Veículos recebidos:', vehicles.length, vehicles.map(v=>v.title));
 
     if (!vehicles.length) {
       container.innerHTML = '<p style="color:var(--gray-300);padding:2rem 0">Nenhum veículo disponível no momento.</p>';
