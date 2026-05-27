@@ -392,7 +392,7 @@ function formatPrice(price) {
 function buildCarCard(v, index) {
   const key = 'slider' + (index + 1);
   const wppMsg = encodeURIComponent('Olá! Tenho interesse no ' + v.title + ' anunciado no site.');
-  const kmText = v.km ? v.km.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' km' : 'Consulte';
+  const kmText = v.km ? String(Math.round(v.km)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' km' : 'Consulte';
   const yearText = v.year || '';
   const fuelText = v.fuel || 'Flex';
   const transText = v.transmission || 'Automático';
