@@ -328,7 +328,7 @@
 // ── Cole aqui a URL do seu Web App do Google Apps Script ──
 // Depois de publicar o script, a URL terá este formato:
 // https://script.google.com/macros/s/XXXXXXX/exec
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUWN9LtCE97z1fQ3mPR3-8duNd1QDBj88TMEF4bF7fdukGOlm1tz2uzTNC6wcw5mBDpw/exec';
+const APPS_SCRIPT_URL = 'COLE_AQUI_A_URL_DO_APPS_SCRIPT';
 
 // ── Slider ──────────────────────────────────────────────
 const SLIDERS = {};
@@ -443,32 +443,35 @@ function buildCarCard(v, index) {
     </div>`;
 }
 
-// ── Fetch do Apps Script ─────────────────────────────────
-async function loadVehicles() {
+// ── Fetch do Apps Script via JSONP (evita bloqueio de redirect CORS) ─
+function loadVehicles() {
   const container = document.getElementById('cars-container');
 
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'COLE_AQUI_A_URL_DO_APPS_SCRIPT') {
-    container.innerHTML = `
-      <div style="padding:2rem;background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.3);border-radius:10px;color:var(--gray-300);font-size:0.9rem;line-height:1.7">
-        ⚙️ <strong style="color:#FFA500">Configure o Apps Script</strong><br>
-        Cole a URL do seu Web App na variável <code>APPS_SCRIPT_URL</code> no topo do JavaScript.
-      </div>`;
+    container.innerHTML = `<div style="padding:2rem;color:var(--gray-300)">⚙️ Configure a URL do Apps Script.</div>`;
     return;
   }
 
-  try {
-    const res  = await fetch(APPS_SCRIPT_URL);
-    const data = await res.json();
-    const vehicles = (data.veiculos || data.vehicles || []).map(v => ({
-      title:        v.titulo        || v.title        || '',
-      price:        v.preco         || v.price        || 0,
-      year:         v.ano           || v.year         || '',
+  // Timeout de 8 segundos
+  const timeout = setTimeout(() => {
+    container.innerHTML = `<div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
+      ⚠️ Não foi possível carregar os veículos agora. <a href="https://api.whatsapp.com/send?phone=5581997821413" target="_blank" style="color:#38bdf8">Entre em contato pelo WhatsApp.</a>
+    </div>`;
+  }, 8000);
+
+  // Callback global chamado pelo script injetado
+  window.__jmCallback = function(data) {
+    clearTimeout(timeout);
+    const vehicles = (data.veiculos || []).map(v => ({
+      title:        v.titulo        || '',
+      price:        v.preco         || 0,
+      year:         v.ano           || '',
       km:           v.km            || 0,
-      fuel:         v.combustivel   || v.fuel         || 'Flex',
-      transmission: v.cambio        || v.transmission || 'Automático',
-      description:  v.descricao     || v.description  || '',
-      images:       v.imagens       || v.images       || [],
-      url:          v.url_olx       || v.url          || '#',
+      fuel:         v.combustivel   || 'Flex',
+      transmission: v.cambio        || 'Automático',
+      description:  v.descricao     || '',
+      images:       v.imagens       || [],
+      url:          v.url_olx       || '#',
     }));
 
     if (!vehicles.length) {
@@ -477,19 +480,25 @@ async function loadVehicles() {
     }
 
     container.innerHTML = vehicles.map((v, i) => buildCarCard(v, i)).join('');
+    vehicles.forEach((v, i) => initSlider('slider' + (i+1), v.images));
+  };
 
-    // Inicia todos os sliders
-    vehicles.forEach((v, i) => {
-      initSlider('slider' + (i+1), v.images);
-    });
-
-  } catch(err) {
-    console.error('Erro ao carregar veículos:', err);
-    container.innerHTML = `
-      <div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
-        ⚠️ Não foi possível carregar os veículos agora. Tente novamente ou entre em contato pelo WhatsApp.
-      </div>`;
-  }
+  // Injeta script tag — ignora CORS e redirects
+  const script = document.createElement('script');
+  script.src = APPS_SCRIPT_URL + '?callback=__jmCallback&t=' + Date.now();
+  script.onerror = () => {
+    clearTimeout(timeout);
+    // Fallback: tenta fetch normal
+    fetch(APPS_SCRIPT_URL + '?t=' + Date.now())
+      .then(r => r.json())
+      .then(data => window.__jmCallback(data))
+      .catch(() => {
+        container.innerHTML = `<div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
+          ⚠️ Não foi possível carregar os veículos. <a href="https://api.whatsapp.com/send?phone=5581997821413" target="_blank" style="color:#38bdf8">Fale pelo WhatsApp.</a>
+        </div>`;
+      });
+  };
+  document.head.appendChild(script);
 }
 
 document.addEventListener('DOMContentLoaded', loadVehicles);
