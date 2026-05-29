@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0A0E1A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JM Consulta">
+<meta name="description" content="Consulte dados de qualquer veículo pela placa e veja o preço na tabela FIPE — JM Autopeças">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Consulta Placa & FIPE — JM Autopeças</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue: #0066FF; --blue-dark: #0047CC; --green: #39FF14;
+  --dark: #0A0E1A; --dark2: #0d1526; --dark3: #111827;
+  --white: #fff; --gray: #C8CDD8; --gray2: #5A6072;
+  --radius: 14px; --radius-sm: 8px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--dark);
+  color: var(--white);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* ── HEADER ── */
+header {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,14,26,0.9);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0,102,255,0.15);
+  padding: 1rem 1.25rem;
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.logo { font-family: 'Barlow Condensed', sans-serif; font-size: 1.4rem; font-weight: 900; color: #fff; letter-spacing: 0.04em; }
+.logo span { color: #38bdf8; }
+.logo-sub { font-size: 0.7rem; color: var(--gray2); font-weight: 400; letter-spacing: 0.08em; text-transform: uppercase; margin-top: -2px; }
+
+/* ── HERO ── */
+.hero {
+  padding: 2.5rem 1.25rem 2rem;
+  text-align: center;
+  background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(0,102,255,0.18) 0%, transparent 65%);
+}
+.hero-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.3);
+  color: var(--green); font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 100px; margin-bottom: 1rem;
+}
+.hero h1 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: clamp(2.2rem, 8vw, 3rem); font-weight: 900; line-height: 1;
+  margin-bottom: 0.5rem;
+}
+.hero h1 em { font-style: normal; color: #38bdf8; }
+.hero p { font-size: 0.9rem; color: var(--gray); max-width: 320px; margin: 0 auto; line-height: 1.6; }
+
+/* ── SEARCH BOX ── */
+.search-wrap { padding: 0 1.25rem 2rem; max-width: 500px; margin: 0 auto; }
+.search-box {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(0,102,255,0.3);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  transition: border-color 0.2s;
+}
+.search-box:focus-within { border-color: #38bdf8; }
+.search-label { font-size: 0.7rem; color: var(--gray2); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.75rem; display: block; }
+.search-row { display: flex; gap: 0.75rem; }
+.placa-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  color: #fff; font-size: 1.2rem; font-weight: 700;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  outline: none; transition: border-color 0.2s;
+}
+.placa-input::placeholder { color: rgba(255,255,255,0.2); font-weight: 400; letter-spacing: 0.1em; }
+.placa-input:focus { border-color: #38bdf8; }
+.btn-search {
+  background: var(--blue); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  padding: 0.85rem 1.4rem;
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+.btn-search:hover { background: var(--blue-dark); transform: translateY(-1px); }
+.btn-search:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.search-hint { font-size: 0.75rem; color: var(--gray2); margin-top: 0.75rem; text-align: center; }
+
+/* ── LOADING ── */
+.loading {
+  display: none; text-align: center; padding: 3rem 1.25rem;
+}
+.spinner {
+  width: 48px; height: 48px; border: 3px solid rgba(0,102,255,0.2);
+  border-top-color: #38bdf8; border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── ERROR ── */
+.error-box {
+  display: none; margin: 0 1.25rem 2rem;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: var(--radius); padding: 1rem 1.25rem;
+  font-size: 0.9rem; color: #fca5a5;
+  display: none; align-items: center; gap: 0.75rem;
+  max-width: 500px; margin-left: auto; margin-right: auto;
+}
+
+/* ── RESULTADO ── */
+.result { display: none; padding: 0 1.25rem 3rem; max-width: 500px; margin: 0 auto; }
+
+.result-header {
+  display: flex; align-items: center; gap: 1rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius); padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+.plate-display {
+  background: #fff; color: #000;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.4rem; font-weight: 900;
+  letter-spacing: 0.2em; padding: 0.5rem 1rem;
+  border-radius: 6px; min-width: 120px; text-align: center;
+  flex-shrink: 0;
+}
+.vehicle-title { font-family: 'Barlow Condensed', sans-serif; font-size: 1.2rem; font-weight: 800; line-height: 1.1; }
+.vehicle-sub { font-size: 0.8rem; color: var(--gray); margin-top: 3px; }
+
+.section-title {
+  font-size: 0.68rem; color: var(--green); font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  margin-bottom: 0.6rem; margin-top: 1.25rem;
+}
+
+.info-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.info-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm); padding: 0.85rem 1rem;
+}
+.info-card .ic-label { font-size: 0.65rem; color: var(--gray2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.info-card .ic-val { font-family: 'Barlow Condensed', sans-serif; font-size: 1.1rem; font-weight: 700; }
+
+.fipe-box {
+  background: linear-gradient(135deg, rgba(0,102,255,0.15) 0%, rgba(0,26,102,0.2) 100%);
+  border: 1.5px solid rgba(56,189,248,0.3);
+  border-radius: var(--radius); padding: 1.25rem;
+  margin-top: 0.5rem;
+}
+.fipe-label { font-size: 0.68rem; color: #38bdf8; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 4px; }
+.fipe-price {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 2.4rem; font-weight: 900; color: #fff; line-height: 1;
+  margin-bottom: 4px;
+}
+.fipe-ref { font-size: 0.75rem; color: var(--gray2); }
+.fipe-codigo { font-size: 0.7rem; color: var(--gray2); margin-top: 2px; }
+
+.no-fipe {
+  background: rgba(255,165,0,0.08); border: 1px solid rgba(255,165,0,0.2);
+  border-radius: var(--radius); padding: 1rem;
+  font-size: 0.85rem; color: #fcd34d; margin-top: 0.5rem;
+}
+
+.btn-wpp {
+  width: 100%; background: #25D366; color: #fff;
+  border: none; border-radius: var(--radius);
+  padding: 1rem; margin-top: 1.25rem;
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  font-family: 'DM Sans', sans-serif;
+  text-decoration: none; transition: opacity 0.2s;
+}
+.btn-wpp:hover { opacity: 0.9; }
+
+.nova-consulta {
+  width: 100%; background: transparent;
+  border: 1px solid rgba(255,255,255,0.12); color: var(--gray);
+  border-radius: var(--radius); padding: 0.85rem;
+  margin-top: 0.75rem; font-size: 0.9rem; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: border-color 0.2s;
+}
+.nova-consulta:hover { border-color: #38bdf8; color: #38bdf8; }
+
+/* ── INSTALL BANNER ── */
+.install-banner {
+  display: none;
+  margin: 0 1.25rem 1.5rem;
+  background: rgba(0,102,255,0.1);
+  border: 1px solid rgba(0,102,255,0.25);
+  border-radius: var(--radius); padding: 1rem 1.25rem;
+  max-width: 500px; margin-left: auto; margin-right: auto;
+}
+.install-banner p { font-size: 0.85rem; color: var(--gray); margin-bottom: 0.75rem; }
+.install-banner strong { color: #fff; }
+.btn-install {
+  background: var(--blue); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 0.6rem 1.2rem;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center; padding: 1.5rem;
+  font-size: 0.75rem; color: var(--gray2);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+footer a { color: #38bdf8; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">JM <span>Auto</span>peças</div>
+    <div class="logo-sub">Consulta Placa & FIPE</div>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">🔍 Grátis & Instantâneo</div>
+  <h1>Consulte qualquer<br><em>veículo</em></h1>
+  <p>Digite a placa e veja os dados completos + preço na Tabela FIPE atualizado.</p>
+</div>
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="install-banner">
+  <p><strong>📱 Instalar como app</strong> — Adicione na tela inicial e use sem internet!</p>
+  <button class="btn-install" id="btn-install">Instalar agora</button>
+</div>
+
+<!-- SEARCH -->
+<div class="search-wrap">
+  <div class="search-box">
+    <span class="search-label">🚗 Digite a placa do veículo</span>
+    <div class="search-row">
+      <input
+        class="placa-input" id="placa-input"
+        type="text" maxlength="8"
+        placeholder="ABC1D23"
+        autocomplete="off" autocorrect="off" spellcheck="false"
+      >
+      <button class="btn-search" id="btn-search" onclick="consultar()">
+        🔍 Consultar
+      </button>
+    </div>
+    <div class="search-hint">Mercosul (ABC1D23) ou antigo (ABC1234)</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <p style="color:var(--gray);font-size:0.9rem">Consultando dados do veículo...</p>
+</div>
+
+<!-- ERROR -->
+<div class="error-box" id="error-box">
+  <span style="font-size:1.3rem">⚠️</span>
+  <span id="error-msg">Veículo não encontrado.</span>
+</div>
+
+<!-- RESULTADO -->
+<div class="result" id="result">
+  <div class="result-header">
+    <div class="plate-display" id="res-placa">-</div>
+    <div>
+      <div class="vehicle-title" id="res-titulo">-</div>
+      <div class="vehicle-sub" id="res-sub">-</div>
+    </div>
+  </div>
+
+  <div class="section-title">📋 Dados do Veículo</div>
+  <div class="info-grid" id="info-grid"></div>
+
+  <div class="section-title">💰 Tabela FIPE</div>
+  <div id="fipe-section"></div>
+
+  <a class="btn-wpp" id="btn-wpp" href="#" target="_blank">
+    💬 Consultar preço com JM Autopeças
+  </a>
+  <button class="nova-consulta" onclick="novaPesquisa()">
+    🔄 Nova consulta
+  </button>
+</div>
+
+<footer>
+  <div>© 2025 JM Autopeças · <a href="https://jmpecasrecife.com.br">jmpecasrecife.com.br</a></div>
+  <div style="margin-top:4px">Dados via BrasilAPI & Parallelum FIPE</div>
+</footer>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+// Substitua pela URL do seu backend no Render depois de publicar
+const API = 'https://jm-backend-k939.onrender.com';
+
+// ── INPUT FORMAT ────────────────────────────────────────
+const input = document.getElementById('placa-input');
+input.addEventListener('input', e => {
+  let v = e.target.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(0,7);
+  e.target.value = v;
+});
+input.addEventListener('keydown', e => { if(e.key==='Enter') consultar(); });
+
+// ── CONSULTA ────────────────────────────────────────────
+async function consultar() {
+  const placa = input.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  if (placa.length < 7) { showError('Digite uma placa válida com 7 caracteres.'); return; }
+
+  showLoading();
+
+  try {
+    const res  = await fetch(`${API}/placa/${placa}`);
+    const data = await res.json();
+
+    if (!res.ok) { showError(data.erro || 'Erro ao consultar.'); return; }
+
+    showResult(data);
+  } catch(e) {
+    showError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+  }
+}
+
+function showResult(data) {
+  hide('loading'); hide('error-box'); show('result');
+
+  const v = data.veiculo;
+  const f = data.fipe;
+
+  document.getElementById('res-placa').textContent = data.placa;
+  document.getElementById('res-titulo').textContent = `${v.marca} ${v.modelo}`;
+  document.getElementById('res-sub').textContent = [v.ano_modelo||v.ano, v.cor, v.combustivel].filter(Boolean).join(' · ');
+
+  // Info grid
+  const fields = [
+    { label: 'Marca',        val: v.marca },
+    { label: 'Modelo',       val: v.modelo },
+    { label: 'Ano Fab.',     val: v.ano },
+    { label: 'Ano Modelo',   val: v.ano_modelo },
+    { label: 'Cor',          val: v.cor },
+    { label: 'Combustível',  val: v.combustivel },
+    { label: 'Município',    val: v.municipio ? `${v.municipio}/${v.uf}` : '' },
+    { label: 'Situação',     val: v.situacao },
+  ].filter(f => f.val);
+
+  document.getElementById('info-grid').innerHTML = fields.map(f => `
+    <div class="info-card">
+      <div class="ic-label">${f.label}</div>
+      <div class="ic-val">${f.val}</div>
+    </div>
+  `).join('');
+
+  // FIPE
+  const fipeEl = document.getElementById('fipe-section');
+  if (f) {
+    fipeEl.innerHTML = `
+      <div class="fipe-box">
+        <div class="fipe-label">Preço médio de mercado</div>
+        <div class="fipe-price">${f.preco}</div>
+        <div class="fipe-ref">Referência: ${f.mes_referencia}</div>
+        <div class="fipe-codigo">Código FIPE: ${f.codigo_fipe} · ${f.combustivel}</div>
+      </div>`;
+  } else {
+    fipeEl.innerHTML = `
+      <div class="no-fipe">
+        ⚠️ Não foi possível localizar o preço FIPE automaticamente para este veículo.
+        Entre em contato com a JM Autopeças para uma avaliação!
+      </div>`;
+  }
+
+  // WhatsApp
+  const msg = encodeURIComponent(`Olá! Consultei o veículo de placa *${data.placa}* (${v.marca} ${v.modelo} ${v.ano_modelo||v.ano}) e gostaria de uma avaliação.${f ? ' FIPE: '+f.preco : ''}`);
+  document.getElementById('btn-wpp').href = `https://api.whatsapp.com/send?phone=5581997821413&text=${msg}`;
+}
+
+function showLoading() {
+  hide('result'); hide('error-box');
+  show('loading');
+  document.getElementById('btn-search').disabled = true;
+}
+
+function showError(msg) {
+  hide('loading'); hide('result');
+  document.getElementById('error-msg').textContent = msg;
+  const el = document.getElementById('error-box');
+  el.style.display = 'flex';
+  document.getElementById('btn-search').disabled = false;
+}
+
+function novaPesquisa() {
+  hide('result'); hide('error-box'); hide('loading');
+  input.value = '';
+  input.focus();
+  document.getElementById('btn-search').disabled = false;
+}
+
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+// ── SERVICE WORKER ───────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// ── PWA INSTALL ─────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-banner').style.display = 'block';
+});
+document.getElementById('btn-install').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') document.getElementById('install-banner').style.display = 'none';
+  deferredPrompt = null;
+});
+</script>
+</body>
+</html>

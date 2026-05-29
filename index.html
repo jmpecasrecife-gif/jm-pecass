@@ -446,36 +446,29 @@ function buildCarCard(v, index) {
 // ── Carrega veículos do Apps Script ──────────────────────
 async function loadVehicles() {
   const container = document.getElementById('cars-container');
-
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'COLE_AQUI_A_URL_DO_APPS_SCRIPT') {
-    container.innerHTML = `<div style="padding:2rem;color:var(--gray-300)">⚙️ Configure a URL do Apps Script.</div>`;
-    return;
-  }
-
   try {
-    const res = await fetch(APPS_SCRIPT_URL, { redirect: 'follow' });
-    const text = await res.text();
-    console.log('Status:', res.status, '| Início:', text.substring(0, 80));
-
-    // Extrai o JSON de dentro do texto (seja JSON puro ou HTML com JSON embutido)
-    const match = text.match(/\{[\s\S]*"veiculos"[\s\S]*\}/);
-    if (!match) throw new Error('JSON não encontrado na resposta');
-    const data = JSON.parse(match[0]);
-
+    // 1. Faz a chamada para o novo backend
+    const res = await fetch('https://jm-backend-k939.onrender.com/veiculos');
+    const data = await res.json();
+    
     const BASE = 'https://jmpecasrecife-gif.github.io/jm-pecass/';
 
-    const vehicles = (data.veiculos || []).map(v => ({
-      title:        v.titulo        || '',
-      price:        v.preco         || 0,
-      year:         v.ano           || '',
+    // 2. ADAPTAÇÃO DA ESTRUTURA:
+    // Se o backend mandar direto a lista, usamos 'data'. Se mandar dentro de um objeto, usamos 'data.veiculos'.
+    const listaDeCarros = Array.isArray(data) ? data : (data.veiculos || []);
+
+    const vehicles = listaDeCarros.map(v => ({
+      title:        v.titulo        || v.title        || '', // aceita tanto em português quanto inglês do banco
+      price:        v.preco         || v.price        || 0,
+      year:         v.ano           || v.year         || '',
       km:           v.km            || 0,
-      fuel:         v.combustivel   || 'Flex',
-      transmission: v.cambio        || 'Automático',
-      description:  v.descricao     || '',
-      images:       (v.imagens || []).map(img =>
+      fuel:         v.combustivel   || v.fuel         || 'Flex',
+      transmission: v.cambio        || v.transmission || 'Automático',
+      description:  v.descricao     || v.description  || '',
+      images:       (v.imagens || v.images || []).map(img =>
         img.startsWith('http') ? img : BASE + img
       ),
-      url:          v.url_olx       || '#',
+      url:          v.url_olx       || v.url          || '#',
     }));
 
     console.log('Veículos recebidos:', vehicles.length, vehicles.map(v=>v.title));
@@ -489,11 +482,13 @@ async function loadVehicles() {
     vehicles.forEach((v, i) => initSlider('slider' + (i + 1), v.images));
 
   } catch (err) {
-    console.error('Erro:', err);
+    console.error('Erro ao carregar veículos:', err);
     container.innerHTML = `
-      <div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:var(--gray-300);font-size:0.9rem">
-        ⚠️ Não foi possível carregar os veículos. <a href="https://api.whatsapp.com/send?phone=5581997821413" target="_blank" style="color:#38bdf8">Fale pelo WhatsApp.</a>
-      </div>`;
+      <div style="padding:2rem;background:rgba(255,0,0,0.06);border:1px solid rgba(255,0,0,0.2);border-radius:8px;text-align:center">
+        <p style="color:#FF4D4D;margin-bottom:0.5rem">Não foi possível carregar os veículos no momento.</p>
+        <p style="color:var(--gray-300);font-size:0.9rem">Verifique sua conexão ou tente novamente mais tarde.</p>
+      </div>
+    `;
   }
 }
 
