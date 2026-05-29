@@ -119,7 +119,7 @@ header {
   border: 1px solid rgba(239,68,68,0.3);
   border-radius: var(--radius); padding: 1rem 1.25rem;
   font-size: 0.9rem; color: #fca5a5;
-  display: none; align-items: center; gap: 0.75rem;
+  align-items: center; gap: 0.75rem;
   max-width: 500px; margin-left: auto; margin-right: auto;
 }
 
@@ -143,6 +143,20 @@ header {
 }
 .vehicle-title { font-family: 'Barlow Condensed', sans-serif; font-size: 1.2rem; font-weight: 800; line-height: 1.1; }
 .vehicle-sub { font-size: 0.8rem; color: var(--gray); margin-top: 3px; }
+
+/* ── FOTO DO CARRO ── */
+.car-image-wrap {
+  width: 100%; border-radius: var(--radius);
+  overflow: hidden; margin-bottom: 1rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: none;
+}
+.car-image-wrap img {
+  width: 100%; display: block;
+  max-height: 200px; object-fit: contain;
+  padding: 0.75rem;
+}
 
 .section-title {
   font-size: 0.68rem; color: var(--green); font-weight: 600;
@@ -174,7 +188,7 @@ header {
   font-size: 2.4rem; font-weight: 900; color: #fff; line-height: 1;
   margin-bottom: 4px;
 }
-.fipe-ref { font-size: 0.75rem; color: var(--gray2); }
+.fipe-modelo { font-size: 0.8rem; color: var(--gray); margin-bottom: 4px; }
 .fipe-codigo { font-size: 0.7rem; color: var(--gray2); margin-top: 2px; }
 
 .no-fipe {
@@ -292,6 +306,11 @@ footer a { color: #38bdf8; text-decoration: none; }
     </div>
   </div>
 
+  <!-- FOTO DO CARRO -->
+  <div class="car-image-wrap" id="car-image-wrap">
+    <img id="car-image" src="" alt="Foto do veículo">
+  </div>
+
   <div class="section-title">📋 Dados do Veículo</div>
   <div class="info-grid" id="info-grid"></div>
 
@@ -308,12 +327,11 @@ footer a { color: #38bdf8; text-decoration: none; }
 
 <footer>
   <div>© 2025 JM Autopeças · <a href="https://jmpecasrecife.com.br">jmpecasrecife.com.br</a></div>
-  <div style="margin-top:4px">Dados via BrasilAPI & Parallelum FIPE</div>
+  <div style="margin-top:4px">Dados via WebXcar & Tabela FIPE</div>
 </footer>
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────
-// Substitua pela URL do seu backend no Render depois de publicar
 const API = 'https://jm-backend-k939.onrender.com';
 
 // ── INPUT FORMAT ────────────────────────────────────────
@@ -351,18 +369,27 @@ function showResult(data) {
 
   document.getElementById('res-placa').textContent = data.placa;
   document.getElementById('res-titulo').textContent = `${v.marca} ${v.modelo}`;
-  document.getElementById('res-sub').textContent = [v.ano_modelo||v.ano, v.cor, v.combustivel].filter(Boolean).join(' · ');
+  document.getElementById('res-sub').textContent = [v.ano_modelo || v.ano, v.cor, v.combustivel].filter(Boolean).join(' · ');
+
+  // Foto do carro
+  const imgWrap = document.getElementById('car-image-wrap');
+  const imgEl   = document.getElementById('car-image');
+  if (f && f.imagem) {
+    imgEl.src = f.imagem;
+    imgWrap.style.display = 'block';
+  } else {
+    imgWrap.style.display = 'none';
+  }
 
   // Info grid
   const fields = [
-    { label: 'Marca',        val: v.marca },
-    { label: 'Modelo',       val: v.modelo },
-    { label: 'Ano Fab.',     val: v.ano },
-    { label: 'Ano Modelo',   val: v.ano_modelo },
-    { label: 'Cor',          val: v.cor },
-    { label: 'Combustível',  val: v.combustivel },
-    { label: 'Município',    val: v.municipio ? `${v.municipio}/${v.uf}` : '' },
-    { label: 'Situação',     val: v.situacao },
+    { label: 'Marca',       val: v.marca },
+    { label: 'Modelo',      val: v.modelo },
+    { label: 'Ano Fab.',    val: v.ano },
+    { label: 'Ano Modelo',  val: v.ano_modelo },
+    { label: 'Cor',         val: v.cor },
+    { label: 'Combustível', val: v.combustivel },
+    { label: 'Município',   val: v.municipio ? `${v.municipio}/${v.uf}` : '' },
   ].filter(f => f.val);
 
   document.getElementById('info-grid').innerHTML = fields.map(f => `
@@ -374,13 +401,17 @@ function showResult(data) {
 
   // FIPE
   const fipeEl = document.getElementById('fipe-section');
-  if (f) {
+  if (f && f.preco) {
+    const preco = typeof f.preco === 'number'
+      ? f.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : f.preco;
+
     fipeEl.innerHTML = `
       <div class="fipe-box">
         <div class="fipe-label">Preço médio de mercado</div>
-        <div class="fipe-price">${f.preco}</div>
-        <div class="fipe-ref">Referência: ${f.mes_referencia}</div>
-        <div class="fipe-codigo">Código FIPE: ${f.codigo_fipe} · ${f.combustivel}</div>
+        <div class="fipe-price">${preco}</div>
+        ${f.modelo ? `<div class="fipe-modelo">${f.modelo}</div>` : ''}
+        <div class="fipe-codigo">Código FIPE: ${f.codigo_fipe}${f.combustivel ? ' · ' + f.combustivel : ''}</div>
       </div>`;
   } else {
     fipeEl.innerHTML = `
@@ -391,7 +422,14 @@ function showResult(data) {
   }
 
   // WhatsApp
-  const msg = encodeURIComponent(`Olá! Consultei o veículo de placa *${data.placa}* (${v.marca} ${v.modelo} ${v.ano_modelo||v.ano}) e gostaria de uma avaliação.${f ? ' FIPE: '+f.preco : ''}`);
+  const preco = f && f.preco
+    ? (typeof f.preco === 'number'
+        ? f.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : f.preco)
+    : null;
+  const msg = encodeURIComponent(
+    `Olá! Consultei o veículo de placa *${data.placa}* (${v.marca} ${v.modelo} ${v.ano_modelo || v.ano}) e gostaria de uma avaliação.${preco ? ' FIPE: ' + preco : ''}`
+  );
   document.getElementById('btn-wpp').href = `https://api.whatsapp.com/send?phone=5581997821413&text=${msg}`;
 }
 
