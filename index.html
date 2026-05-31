@@ -88,10 +88,10 @@
     @media(max-width:760px){.car-card{grid-template-columns:1fr}}
 
     /* Slider */
-    .car-slider{position:relative;overflow:hidden;background:#000;aspect-ratio:4/3}
-    .slides{display:flex;height:100%;transition:transform 0.4s ease}
-    .slide{min-width:100%;height:100%}
-    .slide img{width:100%;height:100%;object-fit:cover;display:block}
+    .car-slider{position:relative;overflow:hidden;background:#000;height:355px}
+    .slides{display:flex;height:355px;transition:transform 0.4s ease}
+    .slide{min-width:100%;height:355px;flex-shrink:0}
+    .slide img{width:100%;height:355px;object-fit:cover;display:block}
     .slider-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);color:#fff;width:40px;height:40px;border-radius:50%;font-size:1.1rem;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center;transition:background 0.2s;backdrop-filter:blur(4px)}
     .slider-btn:hover{background:rgba(0,102,255,0.7);border-color:var(--blue)}
     .slider-btn.prev{left:10px}
