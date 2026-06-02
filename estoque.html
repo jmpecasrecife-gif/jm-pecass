@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JM Autopeças — Estoque</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+:root {
+  --blue: #0066FF;
+  --blue-dark: #0047CC;
+  --blue-light: rgba(0,102,255,0.12);
+  --blue-glow: rgba(0,102,255,0.3);
+  --dark: #060A14;
+  --dark2: #0A0F1E;
+  --dark3: #0F1628;
+  --card: rgba(255,255,255,0.04);
+  --card-hover: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.08);
+  --border-blue: rgba(0,102,255,0.3);
+  --white: #fff;
+  --gray: #C8CDD8;
+  --gray2: #5A6072;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--dark);color:var(--white);min-height:100vh;overflow-x:hidden}
+
+/* BG */
+.bg-glow{position:fixed;top:0;left:50%;transform:translateX(-50%);width:900px;height:500px;pointer-events:none;z-index:0;background:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(0,102,255,0.18) 0%,transparent 70%)}
+.bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.03;background-image:linear-gradient(rgba(56,189,248,1) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,1) 1px,transparent 1px);background-size:40px 40px}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:var(--dark)}
+.login-box{background:var(--dark2);border:1px solid var(--border-blue);border-radius:20px;padding:2.5rem;width:340px;text-align:center}
+.login-logo{font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:800;color:var(--blue);letter-spacing:-0.02em;margin-bottom:0.25rem}
+.login-sub{font-size:0.8rem;color:var(--gray2);margin-bottom:2rem;letter-spacing:0.08em;text-transform:uppercase}
+.login-box input[type=password]{width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.75rem 1rem;color:var(--white);font-size:1rem;font-family:'DM Sans',sans-serif;margin-bottom:1rem;outline:none;transition:border-color 0.2s}
+.login-box input[type=password]:focus{border-color:var(--blue)}
+.btn-login{width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);padding:0.75rem;font-size:1rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background 0.2s}
+.btn-login:hover{background:var(--blue-dark)}
+.login-error{color:var(--red);font-size:0.85rem;margin-top:0.75rem;min-height:1.2rem}
+
+/* LAYOUT */
+.app{display:none;flex-direction:column;min-height:100vh}
+.app.visible{display:flex}
+header{position:sticky;top:0;z-index:100;background:rgba(6,10,20,0.9);backdrop-filter:blur(20px);border-bottom:1px solid rgba(0,102,255,0.15);padding:0.75rem 1.5rem;display:flex;align-items:center;gap:1rem}
+.logo{font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;font-weight:800;color:var(--blue);white-space:nowrap}
+.logo span{color:var(--white)}
+.header-badge{background:rgba(0,102,255,0.15);border:1px solid rgba(0,102,255,0.3);color:var(--blue);border-radius:20px;padding:0.2rem 0.75rem;font-size:0.75rem;font-weight:600;letter-spacing:0.05em}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:0.75rem}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--gray);padding:0.35rem 0.9rem;border-radius:var(--radius-sm);font-size:0.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+main{flex:1;padding:1.5rem;max-width:1400px;margin:0 auto;width:100%;position:relative;z-index:1}
+
+/* TABS */
+.tabs{display:flex;gap:0.5rem;margin-bottom:1.5rem;background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.35rem}
+.tab{flex:1;text-align:center;padding:0.5rem 1rem;border-radius:6px;font-size:0.85rem;font-weight:500;cursor:pointer;color:var(--gray2);transition:all 0.2s;border:none;background:none;font-family:'DM Sans',sans-serif}
+.tab.active{background:var(--blue);color:#fff}
+.tab:hover:not(.active){color:var(--white);background:rgba(255,255,255,0.05)}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem}
+.stat-label{font-size:0.75rem;color:var(--gray2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.4rem}
+.stat-value{font-size:1.7rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--white)}
+.stat-value.blue{color:var(--blue)}
+.stat-value.green{color:var(--green)}
+.stat-value.amber{color:var(--amber)}
+
+/* TOOLBAR */
+.toolbar{display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;align-items:center}
+.search-wrap{flex:1;min-width:220px;position:relative}
+.search-wrap input{width:100%;background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.6rem 1rem 0.6rem 2.5rem;color:var(--white);font-size:0.9rem;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
+.search-wrap input:focus{border-color:var(--blue)}
+.search-wrap::before{content:'🔍';position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);font-size:0.9rem;opacity:0.5;pointer-events:none}
+select.filter{background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.6rem 0.9rem;color:var(--white);font-size:0.85rem;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
+select.filter:focus{border-color:var(--blue)}
+.btn{padding:0.6rem 1.1rem;border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;border:none;display:inline-flex;align-items:center;gap:0.4rem}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:var(--blue-dark)}
+.btn-secondary{background:var(--dark2);border:1px solid var(--border);color:var(--gray)}
+.btn-secondary:hover{border-color:var(--blue);color:var(--white)}
+.btn-success{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:var(--green)}
+.btn-success:hover{background:rgba(34,197,94,0.25)}
+.btn-danger{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:var(--red)}
+.btn-danger:hover{background:rgba(239,68,68,0.25)}
+.btn-amber{background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:var(--amber)}
+.btn-amber:hover{background:rgba(245,158,11,0.25)}
+
+/* TABLE */
+.table-wrap{background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-info{padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.8rem;color:var(--gray2);display:flex;align-items:center;justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:0.85rem}
+th{padding:0.75rem 1rem;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--gray2);border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap}
+td{padding:0.7rem 1rem;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--gray);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--card-hover)}
+.sku{font-family:monospace;font-size:0.78rem;color:var(--blue);background:rgba(0,102,255,0.08);padding:0.2rem 0.5rem;border-radius:4px}
+.badge{display:inline-block;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.72rem;font-weight:600;letter-spacing:0.03em}
+.badge-estoque{background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25)}
+.badge-vendido{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.25)}
+.badge-reservado{background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.25)}
+.row-check{width:1rem;height:1rem;cursor:pointer;accent-color:var(--blue)}
+.actions-cell{white-space:nowrap;display:flex;gap:0.4rem}
+.btn-icon{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:none;cursor:pointer;font-size:0.85rem;transition:all 0.2s}
+.btn-icon-edit{background:rgba(0,102,255,0.1);color:var(--blue)}
+.btn-icon-edit:hover{background:rgba(0,102,255,0.25)}
+.btn-icon-del{background:rgba(239,68,68,0.1);color:var(--red)}
+.btn-icon-del:hover{background:rgba(239,68,68,0.25)}
+.btn-icon-label{background:rgba(245,158,11,0.1);color:var(--amber)}
+.btn-icon-label:hover{background:rgba(245,158,11,0.25)}
+.empty-state{text-align:center;padding:4rem;color:var(--gray2)}
+.empty-icon{font-size:3rem;margin-bottom:1rem;opacity:0.4}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:none;align-items:center;justify-content:center;padding:1rem}
+.overlay.open{display:flex}
+.modal{background:var(--dark2);border:1px solid var(--border-blue);border-radius:20px;padding:2rem;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;position:relative}
+.modal-title{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;color:var(--white)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-grid.full{grid-template-columns:1fr}
+.form-group{display:flex;flex-direction:column;gap:0.4rem}
+.form-group label{font-size:0.78rem;color:var(--gray2);text-transform:uppercase;letter-spacing:0.06em;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.65rem 0.9rem;color:var(--white);font-size:0.9rem;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue)}
+.form-group select option{background:var(--dark2)}
+.form-actions{display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)}
+.modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--gray2);font-size:1.25rem;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:all 0.2s}
+.modal-close:hover{background:rgba(255,255,255,0.1);color:var(--white)}
+
+/* IMPORT */
+.import-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:3rem;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:1.5rem}
+.import-zone:hover,.import-zone.drag{border-color:var(--blue);background:var(--blue-light)}
+.import-zone p{color:var(--gray2);margin-top:0.5rem;font-size:0.85rem}
+.import-preview{background:var(--dark3);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;max-height:300px;overflow-y:auto}
+.import-preview table{font-size:0.78rem}
+
+/* ETIQUETAS */
+#labels-panel{display:none}
+#labels-panel.open{display:block}
+.label-config{background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
+.label-config h3{font-size:0.85rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray2);margin-bottom:1rem}
+.label-size-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;margin-bottom:1rem}
+.label-size-opt{background:var(--dark3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;cursor:pointer;transition:all 0.2s}
+.label-size-opt.selected{border-color:var(--blue);background:rgba(0,102,255,0.1)}
+.label-size-opt strong{display:block;font-size:0.9rem;color:var(--white);margin-bottom:0.2rem}
+.label-size-opt span{font-size:0.75rem;color:var(--gray2)}
+.labels-preview{display:grid;gap:0.75rem;margin-top:1.5rem}
+.print-label{background:#fff;color:#000;border-radius:4px;padding:4px 6px;display:inline-flex;flex-direction:column;gap:2px;font-family:monospace;break-inside:avoid}
+.label-modelo{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.label-peca{font-size:8px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.label-info{font-size:7px;color:#555;display:flex;gap:6px}
+.label-preco{font-size:11px;font-weight:700;color:#000;margin-top:1px}
+.label-barcode svg{display:block}
+.labels-grid-preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:1rem}
+
+/* PRINT */
+@media print{
+  body *{visibility:hidden}
+  #print-area,#print-area *{visibility:visible}
+  #print-area{position:fixed;inset:0;display:flex;flex-wrap:wrap;gap:4mm;padding:4mm;background:#fff;align-content:flex-start}
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;background:var(--dark2);border:1px solid var(--border-blue);border-radius:var(--radius-sm);padding:0.75rem 1.25rem;font-size:0.85rem;display:none;animation:slideIn 0.3s ease}
+.toast.show{display:block}
+@keyframes slideIn{from{transform:translateY(1rem);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="bg-grid"></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">JM <span>Autopeças</span></div>
+    <div class="login-sub">Painel de Estoque</div>
+    <input type="password" id="pwd-input" placeholder="Senha de acesso" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <header>
+    <div class="logo">JM <span>autopeças</span></div>
+    <div class="header-badge">ESTOQUE</div>
+    <div class="header-right">
+      <span id="header-count" style="font-size:0.8rem;color:var(--gray2)"></span>
+      <button class="btn-logout" onclick="doLogout()">Sair</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('estoque')">📦 Estoque</button>
+      <button class="tab" onclick="switchTab('importar')">📥 Importar</button>
+      <button class="tab" onclick="switchTab('etiquetas')">🏷️ Etiquetas</button>
+    </div>
+
+    <!-- ESTOQUE TAB -->
+    <div id="tab-estoque">
+      <!-- STATS -->
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <input type="text" id="search" placeholder="Buscar por peça, SKU, modelo..." oninput="renderTable()">
+        </div>
+        <select class="filter" id="filter-sistema" onchange="renderTable()">
+          <option value="">Todos os sistemas</option>
+        </select>
+        <select class="filter" id="filter-situacao" onchange="renderTable()">
+          <option value="">Todas as situações</option>
+          <option value="ESTOQUE">Em Estoque</option>
+          <option value="VENDIDO">Vendido</option>
+          <option value="RESERVADO">Reservado</option>
+        </select>
+        <select class="filter" id="filter-veiculo" onchange="renderTable()">
+          <option value="">Todos os veículos</option>
+        </select>
+        <select class="filter" id="filter-estado" onchange="renderTable()">
+          <option value="">Todos os estados</option>
+          <option value="Novo">Novo</option>
+          <option value="Usado">Usado</option>
+          <option value="Recondicionado">Recondicionado</option>
+          <option value="Com dano">Com dano</option>
+        </select>
+        <select class="filter" id="filter-sort" onchange="renderTable()">
+          <option value="recentes">Mais recentes</option>
+          <option value="preco_asc">Preço ↑</option>
+          <option value="preco_desc">Preço ↓</option>
+          <option value="peca">Peça A–Z</option>
+        </select>
+        <label class="filter" style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;white-space:nowrap"><input type="checkbox" id="filter-sempreco" onchange="renderTable()" style="accent-color:var(--blue)"> Sem preço</label>
+        <button class="btn btn-secondary" onclick="loadPecas(true)" title="Recarregar do servidor">↻</button>
+        <button class="btn btn-primary" onclick="openModal()">+ Nova Peça</button>
+        <button class="btn btn-amber" id="btn-label-sel" onclick="labelSelected()" style="display:none">🏷️ Etiquetas (<span id="sel-count">0</span>)</button>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-info">
+          <span id="table-info-text"></span>
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;cursor:pointer">
+            <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)" style="accent-color:var(--blue)"> Selecionar todos
+          </label>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>SKU</th>
+                <th>Peça</th>
+                <th>Sistema</th>
+                <th>Veículo</th>
+                <th>Ano</th>
+                <th>Lado</th>
+                <th>Estado</th>
+                <th>Situação</th>
+                <th>Preço</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORTAR TAB -->
+    <div id="tab-importar" style="display:none">
+      <div style="max-width:700px">
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;margin-bottom:0.5rem">Importar Planilha</h2>
+        <p style="color:var(--gray2);font-size:0.85rem;margin-bottom:1.5rem">Importe peças a partir de uma planilha Excel (.xlsx). Use o formato do Catálogo JM ou mapeie as colunas manualmente.</p>
+
+        <div class="import-zone" id="drop-zone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+          <div style="font-size:2.5rem">📊</div>
+          <strong style="font-size:1rem;color:var(--white)">Solte o arquivo aqui ou clique para selecionar</strong>
+          <p>Suporta .xlsx e .xls — Formato: Catálogo HB20 ou planilha personalizada</p>
+          <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+        </div>
+
+        <div id="import-preview-area" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+            <strong id="import-preview-title" style="color:var(--green)"></strong>
+            <div style="display:flex;gap:0.5rem">
+              <button class="btn btn-secondary" onclick="cancelImport()">Cancelar</button>
+              <button class="btn btn-primary" onclick="confirmImport()">✅ Importar Tudo</button>
+            </div>
+          </div>
+
+          <div style="background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:0.75rem">
+            <strong style="font-size:0.78rem;color:var(--gray2);text-transform:uppercase;letter-spacing:0.06em">Valores padrão</strong>
+            <p style="font-size:0.78rem;color:var(--gray2);margin:0.3rem 0 0.75rem">Aplicados às peças que não trazem essas colunas na planilha. Detectamos automaticamente da aba "Resumo" quando existe.</p>
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:160px">
+                <label>Veículo</label>
+                <input type="text" id="def-veiculo" placeholder="Ex: Hyundai HB20" oninput="applyDefaults()">
+              </div>
+              <div class="form-group" style="width:110px">
+                <label>Ano</label>
+                <input type="text" id="def-ano" placeholder="Ex: 2019" oninput="applyDefaults()">
+              </div>
+              <div class="form-group" style="width:110px">
+                <label>Motor</label>
+                <input type="text" id="def-motor" placeholder="Ex: 1.0" oninput="applyDefaults()">
+              </div>
+            </div>
+          </div>
+
+          <div class="import-preview">
+            <table>
+              <thead id="import-thead"></thead>
+              <tbody id="import-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top:2rem;background:var(--dark2);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem">
+          <strong style="font-size:0.85rem;color:var(--gray2);text-transform:uppercase;letter-spacing:0.06em">Colunas esperadas (Catálogo JM)</strong>
+          <div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem" id="col-ref"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETIQUETAS TAB -->
+    <div id="tab-etiquetas" style="display:none">
+      <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;margin-bottom:0.5rem">Gerar Etiquetas</h2>
+      <p style="color:var(--gray2);font-size:0.85rem;margin-bottom:1.5rem">Selecione peças no estoque e gere etiquetas para impressão.</p>
+
+      <div class="label-config">
+        <h3>Tamanho da etiqueta</h3>
+        <div class="label-size-grid" id="label-sizes"></div>
+        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:0.75rem">
+          <label style="font-size:0.8rem;color:var(--gray2)">Cópias por peça:</label>
+          <input type="number" id="label-copies" value="1" min="1" max="99" style="background:var(--dark3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.4rem 0.75rem;color:var(--white);font-size:0.9rem;width:80px;outline:none">
+          <label style="font-size:0.8rem;color:var(--gray2);margin-left:0.5rem">Modo de impressão:</label>
+          <select class="filter" id="label-mode">
+            <option value="termica">Impressora térmica (1 etiqueta por página)</option>
+            <option value="folha">Folha A4 (várias por página)</option>
+          </select>
+          <label style="font-size:0.8rem;color:var(--gray2)"><input type="checkbox" id="label-barcode" checked style="accent-color:var(--blue)"> Código de barras</label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap" id="label-toolbar">
+        <button class="btn btn-secondary" onclick="switchTab('estoque')">← Selecionar no Estoque</button>
+        <button class="btn btn-amber" onclick="printLabels()" id="btn-print-labels">🖨️ Imprimir Etiquetas (<span id="label-count-display">0</span>)</button>
+        <button class="btn btn-secondary" onclick="clearLabelSelection()">Limpar seleção</button>
+      </div>
+
+      <div id="labels-preview-area">
+        <p style="color:var(--gray2);font-size:0.85rem" id="labels-empty-msg">Nenhuma peça selecionada. Vá ao Estoque, selecione as peças e clique em "🏷️ Etiquetas".</p>
+        <div class="labels-grid-preview" id="labels-preview-grid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL NOVA/EDITAR PEÇA -->
+<div class="overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" id="modal-title">Nova Peça</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>SKU / Código</label>
+        <input type="text" id="f-sku" placeholder="Ex: HB20-LAT-001">
+      </div>
+      <div class="form-group">
+        <label>Situação</label>
+        <select id="f-situacao">
+          <option value="ESTOQUE">Em Estoque</option>
+          <option value="VENDIDO">Vendido</option>
+          <option value="RESERVADO">Reservado</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Nome da Peça</label>
+        <input type="text" id="f-peca" placeholder="Ex: Para-lama dianteiro">
+      </div>
+      <div class="form-group">
+        <label>Sistema / Categoria</label>
+        <select id="f-sistema">
+          <option value="LAT">Lataria / Carroceria</option>
+          <option value="VID">Vidros</option>
+          <option value="ILU">Iluminação</option>
+          <option value="INT">Interior</option>
+          <option value="MOT">Motor / Mecânica</option>
+          <option value="CAM">Câmbio / Transmissão</option>
+          <option value="ARR">Arrefecimento</option>
+          <option value="SUS">Suspensão / Direção</option>
+          <option value="FRE">Freios</option>
+          <option value="ROD">Rodas / Pneus</option>
+          <option value="ELE">Elétrica / Eletrônica</option>
+          <option value="CLI">Climatização</option>
+          <option value="OUT">Outros / Diversos</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Lado</label>
+        <select id="f-lado">
+          <option value="">—</option>
+          <option value="LE">LE — Esquerdo</option>
+          <option value="LD">LD — Direito</option>
+          <option value="DE">DE — Diant. Esq.</option>
+          <option value="DD">DD — Diant. Dir.</option>
+          <option value="TE">TE — Tras. Esq.</option>
+          <option value="TD">TD — Tras. Dir.</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Marca / Modelo do Veículo</label>
+        <input type="text" id="f-veiculo" placeholder="Ex: Hyundai HB20">
+      </div>
+      <div class="form-group">
+        <label>Ano</label>
+        <input type="text" id="f-ano" placeholder="Ex: 2019">
+      </div>
+      <div class="form-group">
+        <label>Motor</label>
+        <input type="text" id="f-motor" placeholder="Ex: 1.0">
+      </div>
+      <div class="form-group">
+        <label>Estado da Peça</label>
+        <select id="f-estado">
+          <option value="">—</option>
+          <option value="Novo">Novo</option>
+          <option value="Usado">Usado</option>
+          <option value="Recondicionado">Recondicionado</option>
+          <option value="Com dano">Com dano</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Preço (R$)</label>
+        <input type="number" id="f-preco" placeholder="0,00" step="0.01" min="0">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Observações</label>
+        <textarea id="f-obs" rows="2" placeholder="Informações adicionais..." style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePeca()">Salvar Peça</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- PRINT AREA (invisible, printed) -->
+<div id="print-area" style="display:none"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  JM AUTOPEÇAS — ESTOQUE (integrado à API / MongoDB)
+// ═══════════════════════════════════════════════════════════
+
+// >>> Ajuste aqui se mudar o endereço do backend no Render <<<
+const API = 'https://jm-backend-k939.onrender.com';
+
+// ─── ESTADO ───────────────────────────────────────────────
+let TOKEN = sessionStorage.getItem('jm-token') || '';
+let pecas = [];
+let editingId = null;
+let selectedIds = new Set();
+let labelPecas = [];
+let currentLabelSize = 4; // padrão: 50×30mm (recomendada)
+let domSeq = 0;
+
+// Tamanhos compatíveis com sua impressora:
+// largura de impressão útil 48mm · papel da etiqueta 20–50mm · base 23–53mm
+const LABEL_SIZES = [
+  {name:'33 × 22 mm', w:33, h:22, desc:'Peças pequenas (cabe 3 colunas)'},
+  {name:'40 × 25 mm', w:40, h:25, desc:'Gôndola comum'},
+  {name:'40 × 30 mm', w:40, h:30, desc:'Padrão c/ código de barras'},
+  {name:'50 × 25 mm', w:50, h:25, desc:'Largura máxima (48mm úteis)'},
+  {name:'50 × 30 mm', w:50, h:30, desc:'Recomendada — completa'},
+  {name:'50 × 40 mm', w:50, h:40, desc:'Detalhada — mais texto'},
+];
+
+const SISTEMAS_MAP = {
+  LAT:'Lataria / Carroceria', VID:'Vidros', ILU:'Iluminação',
+  INT:'Interior', MOT:'Motor / Mecânica', CAM:'Câmbio / Transmissão',
+  ARR:'Arrefecimento', SUS:'Suspensão / Direção', FRE:'Freios',
+  ROD:'Rodas / Pneus', ELE:'Elétrica / Eletrônica', CLI:'Climatização', OUT:'Outros / Diversos',
+};
+
+// ─── HELPER DE API ────────────────────────────────────────
+async function api(path, opts = {}) {
+  const headers = Object.assign({}, opts.headers);
+  if (opts.body && !(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN;
+  const res = await fetch(API + path, Object.assign({}, opts, { headers }));
+  if (res.status === 401) {
+    sessionStorage.removeItem('jm-token'); TOKEN = '';
+    toast('Sessão expirada. Faça login novamente.', 'var(--red)');
+    doLogout();
+    throw new Error('401');
+  }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) throw new Error(data?.erro || ('Erro ' + res.status));
+  return data;
+}
+
+// ─── LOGIN ────────────────────────────────────────────────
+async function doLogin() {
+  const senha = document.getElementById('pwd-input').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.querySelector('.btn-login');
+  if (!senha) { errEl.textContent = 'Digite a senha.'; return; }
+  errEl.style.color = 'var(--gray2)';
+  errEl.textContent = 'Conectando ao servidor… (pode levar até ~50s na 1ª vez)';
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  try {
+    const r = await api('/auth/login', { method:'POST', body: JSON.stringify({ senha }) });
+    TOKEN = r.token;
+    sessionStorage.setItem('jm-token', TOKEN);
+    errEl.textContent = '';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    init();
+  } catch (e) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = e.message === '401' ? 'Senha incorreta.' : (e.message || 'Falha ao conectar.');
+    document.getElementById('pwd-input').value = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+function doLogout() {
+  sessionStorage.removeItem('jm-token'); TOKEN = '';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('pwd-input').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+async function init() {
+  buildLabelSizes();
+  buildColRef();
+  await loadPecas();
+}
+
+// se já houver token salvo, valida e pula o login
+async function autoLogin() {
+  if (!TOKEN) return;
+  try {
+    await api('/auth/check');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    init();
+  } catch { /* token inválido — fica na tela de login */ }
+}
+
+// ─── CARREGAR PEÇAS DA API ────────────────────────────────
+async function loadPecas(avisar) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">⏳</div><div>Carregando estoque…</div></div></td></tr>`;
+  try {
+    const r = await api('/pecas');
+    pecas = (r.pecas || []).map(p => ({ ...p, id: p._id }));
+    buildFilters();
+    renderTable();
+    renderStats();
+    document.getElementById('header-count').textContent = `${pecas.length} peças`;
+    if (avisar) toast('Estoque atualizado.');
+  } catch (e) {
+    if (e.message !== '401') {
+      tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">⚠️</div><div>Erro ao carregar: ${e.message}</div><div style="margin-top:.75rem"><button class="btn btn-secondary" onclick="loadPecas()">Tentar novamente</button></div></div></td></tr>`;
+    }
+  }
+}
+
+// ─── UTILS ────────────────────────────────────────────────
+function toast(msg,color='var(--green)'){const t=document.getElementById('toast');t.textContent=msg;t.style.borderColor=color;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
+function fmt(n){return n?'R$ '+Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}
+function sistemaLabel(cod){return SISTEMAS_MAP[cod]||cod||''}
+function codigoBarras(p){return p.sku || ('JM'+String(p.id||'').slice(-6).toUpperCase())}
+
+// ─── TABS ─────────────────────────────────────────────────
+function switchTab(tab) {
+  ['estoque','importar','etiquetas'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab?'block':'none';
+    document.querySelectorAll('.tab')[['estoque','importar','etiquetas'].indexOf(t)].classList.toggle('active',t===tab);
+  });
+  if (tab==='etiquetas') renderLabels();
+}
+
+// ─── FILTROS ──────────────────────────────────────────────
+function buildFilters() {
+  const sistemas = [...new Set(pecas.map(p=>p.sistema).filter(Boolean))];
+  const fSis = document.getElementById('filter-sistema');
+  const sisVal = fSis.value;
+  fSis.innerHTML = '<option value="">Todos os sistemas</option>';
+  sistemas.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=sistemaLabel(s); fSis.appendChild(o); });
+  fSis.value = sisVal;
+
+  const veiculos = [...new Set(pecas.map(p=>p.veiculo).filter(Boolean))];
+  const fVei = document.getElementById('filter-veiculo');
+  const veiVal = fVei.value;
+  fVei.innerHTML = '<option value="">Todos os veículos</option>';
+  veiculos.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; fVei.appendChild(o); });
+  fVei.value = veiVal;
+}
+
+function getFiltered() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const sis = document.getElementById('filter-sistema').value;
+  const sit = document.getElementById('filter-situacao').value;
+  const vei = document.getElementById('filter-veiculo').value;
+  const est = document.getElementById('filter-estado').value;
+  const semPreco = document.getElementById('filter-sempreco').checked;
+  const sort = document.getElementById('filter-sort').value;
+  let arr = pecas.filter(p =>
+    (!q || [p.sku,p.peca,p.veiculo,sistemaLabel(p.sistema),p.obs,p.ano].join(' ').toLowerCase().includes(q)) &&
+    (!sis || p.sistema===sis) &&
+    (!sit || p.situacao===sit) &&
+    (!vei || p.veiculo===vei) &&
+    (!est || p.estado===est) &&
+    (!semPreco || !p.preco)
+  );
+  if (sort==='preco_asc') arr.sort((a,b)=>(a.preco||0)-(b.preco||0));
+  else if (sort==='preco_desc') arr.sort((a,b)=>(b.preco||0)-(a.preco||0));
+  else if (sort==='peca') arr.sort((a,b)=>(a.peca||'').localeCompare(b.peca||''));
+  return arr;
+}
+
+// ─── TABELA ───────────────────────────────────────────────
+function renderTable() {
+  const filtered = getFiltered();
+  const tbody = document.getElementById('table-body');
+  document.getElementById('table-info-text').textContent = `${filtered.length} peça(s) de ${pecas.length} total`;
+
+  if (filtered.length===0) {
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📦</div><div>Nenhuma peça encontrada</div></div></td></tr>`;
+    updateSelButton(); return;
+  }
+
+  tbody.innerHTML = filtered.map(p => `
+    <tr>
+      <td><input type="checkbox" class="row-check" data-id="${p.id}" ${selectedIds.has(p.id)?'checked':''} onchange="toggleRow('${p.id}',this.checked)"></td>
+      <td><span class="sku">${p.sku||'—'}</span></td>
+      <td style="color:var(--white);font-weight:500">${p.peca||'—'}</td>
+      <td>${sistemaLabel(p.sistema)||'—'}</td>
+      <td>${p.veiculo||'—'}</td>
+      <td>${p.ano||'—'}</td>
+      <td>${p.lado||'—'}</td>
+      <td style="color:var(--gray2)">${p.estado||'—'}</td>
+      <td><span class="badge badge-${(p.situacao||'estoque').toLowerCase()}">${p.situacao||'ESTOQUE'}</span></td>
+      <td class="price-cell" style="cursor:pointer" onclick="editPriceInline('${p.id}',this)" title="Clique para editar o preço">${p.preco?`<span style="color:var(--green);font-weight:500">${fmt(p.preco)}</span>`:'<span style="color:var(--amber);font-style:italic;font-size:0.8rem">+ preço</span>'}</td>
+      <td><div class="actions-cell">
+        <button class="btn-icon btn-icon-label" onclick="labelOne('${p.id}')" title="Gerar etiqueta">🏷️</button>
+        <button class="btn-icon btn-icon-edit" onclick="editPeca('${p.id}')" title="Editar">✏️</button>
+        <button class="btn-icon btn-icon-del" onclick="deletePeca('${p.id}')" title="Excluir">🗑️</button>
+      </div></td>
+    </tr>
+  `).join('');
+  updateSelButton();
+}
+
+function updateSelButton() {
+  const selBtn = document.getElementById('btn-label-sel');
+  if (selectedIds.size>0) { selBtn.style.display='inline-flex'; document.getElementById('sel-count').textContent=selectedIds.size; }
+  else selBtn.style.display='none';
+}
+
+// edição rápida de preço direto na tabela
+function renderPriceCell(td, p) {
+  td.innerHTML = p.preco
+    ? `<span style="color:var(--green);font-weight:500">${fmt(p.preco)}</span>`
+    : '<span style="color:var(--amber);font-style:italic;font-size:0.8rem">+ preço</span>';
+}
+
+function editPriceInline(id, td) {
+  if (td.querySelector('input')) return;
+  const p = pecas.find(x=>x.id===id);
+  if (!p) return;
+  td.innerHTML = `<input type="number" step="0.01" min="0" value="${p.preco||''}" placeholder="0,00"
+    style="width:96px;background:var(--dark3);border:1px solid var(--blue);border-radius:6px;padding:0.3rem 0.5rem;color:var(--white);font-size:0.85rem;outline:none">`;
+  const input = td.querySelector('input');
+  input.focus(); input.select();
+  let done = false;
+  const commit = async () => {
+    if (done) return; done = true;
+    const novo = parseFloat(input.value) || 0;
+    if (novo === (p.preco||0)) { renderPriceCell(td, p); return; }
+    td.innerHTML = '<span style="color:var(--gray2);font-size:0.8rem">salvando…</span>';
+    try {
+      await api('/pecas/'+id, { method:'PUT', body: JSON.stringify({ preco: novo }) });
+      p.preco = novo;
+      renderPriceCell(td, p);
+      renderStats();
+      toast('Preço atualizado.');
+    } catch (e) {
+      renderPriceCell(td, p);
+      if (e.message!=='401') toast('Erro ao salvar preço: '+e.message, 'var(--red)');
+    }
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key==='Enter') { e.preventDefault(); input.blur(); }
+    else if (e.key==='Escape') { done = true; renderPriceCell(td, p); }
+  });
+  input.addEventListener('blur', commit);
+}
+
+function renderStats() {
+  const total = pecas.length;
+  const estoque = pecas.filter(p=>p.situacao==='ESTOQUE').length;
+  const vendido = pecas.filter(p=>p.situacao==='VENDIDO').length;
+  const semPreco = pecas.filter(p=>!p.preco).length;
+  const valorTotal = pecas.filter(p=>p.situacao==='ESTOQUE').reduce((s,p)=>s+(Number(p.preco)||0),0);
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total de Peças</div><div class="stat-value blue">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Em Estoque</div><div class="stat-value green">${estoque}</div></div>
+    <div class="stat-card"><div class="stat-label">Sem Preço</div><div class="stat-value amber">${semPreco}</div></div>
+    <div class="stat-card"><div class="stat-label">Vendidas</div><div class="stat-value" style="color:var(--red)">${vendido}</div></div>
+    <div class="stat-card"><div class="stat-label">Valor em Estoque</div><div class="stat-value amber">${fmt(valorTotal)}</div></div>
+  `;
+}
+
+// ─── SELEÇÃO ──────────────────────────────────────────────
+function toggleRow(id, checked) {
+  if (checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateSelButton();
+}
+function toggleSelectAll(checked) {
+  getFiltered().forEach(p => { if(checked) selectedIds.add(p.id); else selectedIds.delete(p.id); });
+  renderTable();
+}
+
+// ─── CRUD ─────────────────────────────────────────────────
+function openModal(peca=null) {
+  editingId = peca?peca.id:null;
+  document.getElementById('modal-title').textContent = peca?'Editar Peça':'Nova Peça';
+  const fields = {sku:'',peca:'',sistema:'LAT',lado:'',veiculo:'',ano:'',motor:'',estado:'',situacao:'ESTOQUE',preco:'',obs:''};
+  if(peca) Object.assign(fields,peca);
+  Object.entries(fields).forEach(([k,v])=>{ const el=document.getElementById('f-'+k); if(el) el.value=v||''; });
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open')}
+
+async function savePeca() {
+  const peca = {
+    sku: document.getElementById('f-sku').value.trim(),
+    peca: document.getElementById('f-peca').value.trim(),
+    sistema: document.getElementById('f-sistema').value,
+    lado: document.getElementById('f-lado').value,
+    veiculo: document.getElementById('f-veiculo').value.trim(),
+    ano: document.getElementById('f-ano').value.trim(),
+    motor: document.getElementById('f-motor').value.trim(),
+    estado: document.getElementById('f-estado').value,
+    situacao: document.getElementById('f-situacao').value,
+    preco: parseFloat(document.getElementById('f-preco').value)||0,
+    obs: document.getElementById('f-obs').value.trim(),
+  };
+  if(!peca.peca){toast('Informe o nome da peça.','var(--red)');return}
+  const btn = document.querySelector('#modal-overlay .btn-primary');
+  btn.disabled = true; const txt = btn.textContent; btn.textContent='Salvando…';
+  try {
+    if (editingId) await api('/pecas/'+editingId, { method:'PUT', body: JSON.stringify(peca) });
+    else await api('/pecas', { method:'POST', body: JSON.stringify(peca) });
+    closeModal();
+    toast(editingId?'Peça atualizada!':'Peça cadastrada!');
+    await loadPecas();
+  } catch (e) {
+    if (e.message!=='401') toast('Erro: '+e.message, 'var(--red)');
+  } finally { btn.disabled=false; btn.textContent=txt; }
+}
+
+function editPeca(id){openModal(pecas.find(p=>p.id===id))}
+
+async function deletePeca(id) {
+  if(!confirm('Excluir esta peça? Esta ação não pode ser desfeita.')) return;
+  try {
+    await api('/pecas/'+id, { method:'DELETE' });
+    selectedIds.delete(id);
+    toast('Peça removida.','var(--red)');
+    await loadPecas();
+  } catch (e) { if (e.message!=='401') toast('Erro: '+e.message,'var(--red)'); }
+}
+
+// ─── IMPORTAÇÃO (planilha Excel) ──────────────────────────
+let importRows = [];
+
+function buildColRef() {
+  const cols = ['SKU','Peca','Sistema','Lado','Veiculo','Ano','Motor','Estado','Situacao','Preco','Observacoes'];
+  document.getElementById('col-ref').innerHTML = cols.map(c=>`<span style="background:var(--dark3);border:1px solid var(--border);border-radius:4px;padding:0.2rem 0.6rem;font-size:0.75rem;font-family:monospace;color:var(--blue)">${c}</span>`).join('');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+}
+
+// aceita o código do sistema OU o nome por extenso
+function normalizaSistema(v){
+  if(!v) return '';
+  const s = String(v).trim();
+  if (SISTEMAS_MAP[s.toUpperCase()]) return s.toUpperCase();
+  const achado = Object.entries(SISTEMAS_MAP).find(([,nome])=>nome.toLowerCase()===s.toLowerCase());
+  return achado ? achado[0] : s;
+}
+
+// procura "Veiculo: X | Ano: Y | Motor: Z" em qualquer aba (ex: aba Resumo)
+function detectarMeta(wb) {
+  const re = /Ve[ií]culo:\s*(.+?)\s*\|\s*Ano:\s*(.+?)\s*\|\s*Motor:\s*(.+)/i;
+  for (const sn of wb.SheetNames) {
+    const ws = wb.Sheets[sn];
+    const linhas = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    for (const linha of linhas) {
+      for (const cel of linha) {
+        if (typeof cel === 'string') {
+          const m = cel.match(re);
+          if (m) return { veiculo:m[1].trim(), ano:m[2].trim(), motor:m[3].trim() };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function handleFile(file) {
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const sheetName = wb.SheetNames.includes('Catalogo') ? 'Catalogo' : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(ws, {defval:''});
+    const g = (row, ...keys) => { for(const k of keys){ if(row[k]!==undefined && row[k]!=='') return row[k]; } return ''; };
+
+    importRows = data.map(row => {
+      const veic = g(row,'Veiculo','Veículo','Modelo','veiculo');
+      const ano  = String(g(row,'Ano','ano')||'');
+      const mot  = String(g(row,'Motor','motor')||'');
+      return {
+        sku:      g(row,'SKU','Codigo (SKU)','Código','Codigo','sku'),
+        peca:     g(row,'Peca','Peça','peca','Descricao','Descrição'),
+        sistema:  normalizaSistema(g(row,'Sistema (cod)','Sistema','Categoria','sistema')),
+        lado:     g(row,'Lado','lado'),
+        veiculo:  veic,
+        ano,
+        motor:    mot,
+        estado:   g(row,'Estado','estado','Condicao','Condição'),
+        situacao: (g(row,'Situacao','Situação','situacao')||'ESTOQUE').toString().toUpperCase(),
+        preco:    parseFloat(String(g(row,'Preco (R$)','Preco','Preço','preco','Valor')).replace(/\./g,'').replace(',','.'))||0,
+        obs:      g(row,'Observacoes','Observações','Obs','obs'),
+        // marca quais vieram da própria planilha (não sobrescrever com padrão)
+        _veic: !!veic, _ano: !!ano, _mot: !!mot,
+      };
+    }).filter(r=>r.peca||r.sku);
+
+    // detecta metadados (ex.: aba Resumo) e pré-preenche os campos padrão
+    const meta = detectarMeta(wb);
+    if (meta) {
+      if(!document.getElementById('def-veiculo').value) document.getElementById('def-veiculo').value = meta.veiculo;
+      if(!document.getElementById('def-ano').value)     document.getElementById('def-ano').value = meta.ano;
+      if(!document.getElementById('def-motor').value)   document.getElementById('def-motor').value = meta.motor;
+    }
+
+    const semPreco = importRows.filter(r=>!r.preco).length;
+    const aviso = semPreco ? ` · ${semPreco} sem preço (entram como R$ 0 — edite depois)` : '';
+    document.getElementById('import-preview-title').textContent = `✅ ${importRows.length} peças na aba "${sheetName}"${aviso}`;
+    document.getElementById('import-preview-area').style.display='block';
+    applyDefaults();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// aplica os valores padrão às linhas que não trazem o dado e re-renderiza o preview
+function applyDefaults() {
+  const dv = document.getElementById('def-veiculo').value.trim();
+  const da = document.getElementById('def-ano').value.trim();
+  const dm = document.getElementById('def-motor').value.trim();
+  importRows.forEach(r => {
+    if(!r._veic) r.veiculo = dv;
+    if(!r._ano)  r.ano = da;
+    if(!r._mot)  r.motor = dm;
+  });
+  renderImportPreview();
+}
+
+function renderImportPreview() {
+  const cols = ['sku','peca','sistema','lado','veiculo','ano','preco','situacao'];
+  document.getElementById('import-thead').innerHTML = `<tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+  document.getElementById('import-tbody').innerHTML = importRows.slice(0,30).map(r=>`<tr>${cols.map(c=>`<td>${(c==='preco'?fmt(r[c]):r[c])||'—'}</td>`).join('')}</tr>`).join('');
+}
+
+function cancelImport(){
+  document.getElementById('import-preview-area').style.display='none';
+  importRows=[];
+  document.getElementById('file-input').value='';
+  ['def-veiculo','def-ano','def-motor'].forEach(id=>document.getElementById(id).value='');
+}
+
+async function confirmImport() {
+  if(importRows.length===0){toast('Nada para importar.','var(--amber)');return}
+  applyDefaults();
+  // remove marcadores internos antes de enviar
+  const payload = importRows.map(({_veic,_ano,_mot,...r})=>r);
+  const btn = document.querySelector('#import-preview-area .btn-primary');
+  btn.disabled=true; const txt=btn.textContent; btn.textContent='Importando…';
+  try {
+    const r = await api('/pecas/importar', { method:'POST', body: JSON.stringify(payload) });
+    cancelImport();
+    switchTab('estoque');
+    await loadPecas();
+    toast(`${r.inseridas} inseridas, ${r.atualizadas} atualizadas!`);
+  } catch (e) {
+    if (e.message!=='401') toast('Erro na importação: '+e.message,'var(--red)');
+  } finally { btn.disabled=false; btn.textContent=txt; }
+}
+
+// ─── ETIQUETAS ────────────────────────────────────────────
+function buildLabelSizes() {
+  const el = document.getElementById('label-sizes');
+  el.innerHTML = LABEL_SIZES.map((s,i)=>`
+    <div class="label-size-opt ${i===currentLabelSize?'selected':''}" onclick="selectLabelSize(${i})">
+      <strong>${s.name}</strong>
+      <span>${s.desc}</span>
+    </div>
+  `).join('');
+}
+function selectLabelSize(i){currentLabelSize=i;buildLabelSizes();renderLabels()}
+
+function labelOne(id) {
+  selectedIds.add(id);
+  switchTab('etiquetas');
+}
+function labelSelected() { switchTab('etiquetas'); }
+function clearLabelSelection(){selectedIds.clear();labelPecas=[];renderTable();renderLabels()}
+
+// monta o HTML interno de uma etiqueta (usado no preview e na impressão)
+function labelInner(p, H_px, barcodeOn) {
+  const big = H_px > 90;
+  const code = codigoBarras(p);
+  const bcId = 'bc-' + (domSeq++);
+  return {
+    bcId, code,
+    html: `
+      <div style="font-weight:700;font-family:'Barlow Condensed',monospace;text-transform:uppercase;line-height:1.05;font-size:${big?11:9}px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${(p.veiculo||'JM Autopeças')} ${p.ano||''}</div>
+      <div style="font-size:${big?9:7.5}px;color:#222;line-height:1.05;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${p.peca||''}${p.lado?' — '+p.lado:''}</div>
+      <div style="font-size:${big?7.5:6.5}px;color:#666;line-height:1.05">${sistemaLabel(p.sistema)}${p.estado?' · '+p.estado:''}</div>
+      <div style="font-size:${big?14:11}px;font-weight:800;line-height:1.1;margin-top:1px">${fmt(p.preco)}</div>
+      ${barcodeOn ? `<svg id="${bcId}" data-code="${code}" style="max-width:100%;display:block;margin-top:auto"></svg>` : ''}
+    `
+  };
+}
+
+function renderLabels() {
+  labelPecas = pecas.filter(p=>selectedIds.has(p.id));
+  document.getElementById('label-count-display').textContent = labelPecas.length;
+  const grid = document.getElementById('labels-preview-grid');
+  const msg = document.getElementById('labels-empty-msg');
+  if(labelPecas.length===0){grid.innerHTML='';msg.style.display='';return}
+  msg.style.display='none';
+  const size = LABEL_SIZES[currentLabelSize];
+  const PX = 3.78; // 96dpi / 25.4
+  const W = Math.round(size.w*PX), H = Math.round(size.h*PX);
+  const barcodeOn = document.getElementById('label-barcode').checked && size.h>=22;
+
+  const built = labelPecas.map(p=>labelInner(p,H,barcodeOn));
+  grid.innerHTML = built.map(b=>`
+    <div class="print-label" style="width:${W}px;height:${H}px;padding:4px 5px;display:flex;flex-direction:column;gap:1px;overflow:hidden;background:#fff;border:1px solid #ccc;border-radius:3px">
+      ${b.html}
+    </div>`).join('');
+
+  setTimeout(()=>{
+    built.forEach(b=>{
+      const el = document.getElementById(b.bcId);
+      if(el){ try{ JsBarcode('#'+b.bcId, b.code, {format:'CODE128',width:1.1,height:Math.max(14,H*0.22),displayValue:true,fontSize:7,margin:0,textMargin:1,background:'#fff',lineColor:'#000'}); }catch(e){} }
+    });
+  }, 60);
+}
+
+function printLabels() {
+  labelPecas = pecas.filter(p=>selectedIds.has(p.id));
+  if(labelPecas.length===0){toast('Nenhuma peça selecionada.','var(--amber)');return}
+  const copies = Math.max(1, parseInt(document.getElementById('label-copies').value)||1);
+  const mode = document.getElementById('label-mode').value; // termica | folha
+  const barcodeOn = document.getElementById('label-barcode').checked;
+  const size = LABEL_SIZES[currentLabelSize];
+  const H_px = Math.round(size.h*3.78);
+
+  // gera os SVGs de código de barras já no documento atual (mais confiável)
+  domSeq = 0;
+  const items = [];
+  labelPecas.forEach(p=>{ for(let c=0;c<copies;c++) items.push(labelInner(p, H_px, barcodeOn && size.h>=22)); });
+
+  const labelsHtml = items.map(b=>`
+    <div class="lbl">${b.html}</div>
+  `).join('');
+
+  const oneClass = mode==='termica'
+    ? `@page{size:${size.w}mm ${size.h}mm;margin:0}
+       .lbl{width:${size.w}mm;height:${size.h}mm;page-break-after:always}`
+    : `@page{size:A4;margin:5mm}
+       .lbl{width:${size.w}mm;height:${size.h}mm}`;
+
+  const win = window.open('','_blank','width=800,height=680');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Etiquetas — JM Autopeças</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;padding:14px}
+      .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+      .bar button{padding:7px 18px;background:#0066FF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+      .bar button.sec{background:#e5e7eb;color:#333}
+      .bar span{font-size:12px;color:#666}
+      .sheet{display:flex;flex-wrap:wrap;gap:${mode==='termica'?'0':'2mm'};align-content:flex-start;background:#fff;padding:${mode==='termica'?'0':'4mm'};border-radius:6px}
+      .lbl{background:#fff;color:#000;border:1px solid #ddd;border-radius:2px;padding:1.2mm 1.6mm;display:flex;flex-direction:column;gap:.3mm;overflow:hidden}
+      .lbl svg{display:block}
+      @media print{
+        body{background:#fff;padding:0}
+        .bar{display:none}
+        .sheet{gap:${mode==='termica'?'0':'2mm'};padding:0;border-radius:0}
+        .lbl{border:none}
+        ${oneClass}
+      }
+      ${mode==='termica'?'':'.lbl{border:1px solid #ccc}'}
+    </style></head><body>
+    <div class="bar">
+      <button onclick="window.print()">🖨️ Imprimir</button>
+      <button class="sec" onclick="window.close()">Fechar</button>
+      <span>${labelPecas.length} peça(s) × ${copies} = ${items.length} etiqueta(s) · ${size.name} · ${mode==='termica'?'térmica':'folha A4'}</span>
+    </div>
+    <div class="sheet">${labelsHtml}</div>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+    <script>
+      window.addEventListener('load',function(){
+        document.querySelectorAll('svg[data-code]').forEach(function(svg){
+          try{ JsBarcode(svg, svg.getAttribute('data-code'), {format:'CODE128',width:1.1,height:${Math.max(28, Math.round(size.h*1.6))},displayValue:true,fontSize:9,margin:0,textMargin:1,background:'#fff',lineColor:'#000'}); }catch(e){}
+        });
+      });
+    <\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+// ─── BOOT ─────────────────────────────────────────────────
+autoLogin();
+</script>
+</body>
+</html>
