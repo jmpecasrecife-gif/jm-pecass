@@ -366,7 +366,16 @@ tr:hover td{background:var(--card-hover)}
       <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap" id="label-toolbar">
         <button class="btn btn-secondary" onclick="switchTab('estoque')">← Selecionar no Estoque</button>
         <button class="btn btn-amber" onclick="printLabels()" id="btn-print-labels">🖨️ Imprimir Etiquetas (<span id="label-count-display">0</span>)</button>
+        <button class="btn btn-primary" onclick="niimbotPrint()" id="btn-niimbot" title="Imprimir direto na Niimbot B1 via Bluetooth">📲 Niimbot B1</button>
         <button class="btn btn-secondary" onclick="clearLabelSelection()">Limpar seleção</button>
+      </div>
+
+      <!-- STATUS NIIMBOT -->
+      <div id="niimbot-status" style="display:none;background:var(--dark2);border:1px solid var(--border-blue);border-radius:var(--radius-sm);padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:var(--gray2)">
+        <span id="niimbot-status-text">Conectando...</span>
+        <div id="niimbot-progress-bar" style="display:none;height:6px;background:rgba(0,102,255,0.15);border-radius:3px;margin-top:0.5rem;overflow:hidden">
+          <div id="niimbot-progress-fill" style="height:100%;background:var(--blue);border-radius:3px;width:0%;transition:width 0.3s"></div>
+        </div>
       </div>
 
       <div id="labels-preview-area">
@@ -1067,6 +1076,282 @@ function printLabels() {
 
 // ─── BOOT ─────────────────────────────────────────────────
 autoLogin();
+
+// ═══════════════════════════════════════════════════════════
+//  NIIMBOT B1 — DRIVER BLE (engenharia reversa do protocolo)
+//  Baseado em: https://github.com/MultiMote/niimblue
+//  A Niimbot B1 usa BLE com um serviço serial (NUS-like)
+// ═══════════════════════════════════════════════════════════
+
+const NIIMBOT = (() => {
+  // UUIDs do serviço e características BLE da Niimbot B1
+  const SERVICE_UUID       = '0000ff00-0000-1000-8000-00805f9b34fb';
+  const CHAR_WRITE_UUID    = '0000ff02-0000-1000-8000-00805f9b34fb';
+  const CHAR_NOTIFY_UUID   = '0000ff01-0000-1000-8000-00805f9b34fb';
+
+  let device = null, writeChar = null;
+
+  // Constrói um pacote no protocolo Niimbot
+  // Formato: 55 55 <cmd> <len> <data...> <checksum> AA AA
+  function buildPacket(cmd, data = []) {
+    const len = data.length;
+    let chk = cmd ^ len;
+    for (const b of data) chk ^= b;
+    return new Uint8Array([0x55, 0x55, cmd, len, ...data, chk, 0xAA, 0xAA]);
+  }
+
+  async function send(cmd, data = []) {
+    const pkt = buildPacket(cmd, data);
+    await writeChar.writeValueWithoutResponse(pkt);
+  }
+
+  // Converte canvas 1-bit em linhas de bytes para a Niimbot
+  // A impressora recebe 1 byte por 8 pixels, MSB primeiro
+  function canvasToLines(canvas) {
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const lines = [];
+    for (let y = 0; y < height; y++) {
+      const rowBytes = Math.ceil(width / 8);
+      const row = new Uint8Array(rowBytes);
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const r = imgData.data[i], g = imgData.data[i+1], b = imgData.data[i+2];
+        const gray = (r * 299 + g * 587 + b * 114) / 1000;
+        if (gray < 128) {           // pixel escuro = imprimir
+          row[Math.floor(x / 8)] |= (0x80 >> (x % 8));
+        }
+      }
+      lines.push(row);
+    }
+    return lines;
+  }
+
+  // Conecta ao dispositivo BLE
+  async function connect() {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { namePrefix: 'B1' },
+        { namePrefix: 'D11' },
+        { namePrefix: 'Niimbot' },
+      ],
+      optionalServices: [SERVICE_UUID],
+    });
+    const server  = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    writeChar     = await service.getCharacteristic(CHAR_WRITE_UUID);
+
+    // Habilita notificações (necessário para heartbeat)
+    try {
+      const notifyChar = await service.getCharacteristic(CHAR_NOTIFY_UUID);
+      await notifyChar.startNotifications();
+    } catch(e) { /* ignorar se não suportar */ }
+    return device.name || 'Niimbot';
+  }
+
+  function disconnect() {
+    if (device && device.gatt.connected) device.gatt.disconnect();
+    device = null; writeChar = null;
+  }
+
+  // Imprime um canvas (já renderizado, 1-bit efetivo)
+  async function printCanvas(canvas, copies = 1, onProgress) {
+    const lines = canvasToLines(canvas);
+    const totalLines = lines.length;
+    const printWidth = canvas.width; // pixels de largura
+
+    // CMD 0x01 — configurar impressão: cópias, quantidade de linhas, largura
+    const totalLinesHi = (totalLines >> 8) & 0xFF;
+    const totalLinesLo = totalLines & 0xFF;
+    const copiesHi = (copies >> 8) & 0xFF;
+    const copiesLo = copies & 0xFF;
+    // Largura em bytes (a B1 usa 48mm úteis = 384 dots a 203 DPI, mas aceitamos a largura do canvas)
+    const widthBytes = Math.ceil(printWidth / 8);
+
+    // CMD 0x01: iniciar trabalho de impressão
+    await send(0x01, [
+      copiesHi, copiesLo,
+      totalLinesHi, totalLinesLo,
+      widthBytes,
+      0x00,
+    ]);
+    await sleep(50);
+
+    // CMD 0x83: enviar linha a linha
+    for (let i = 0; i < lines.length; i++) {
+      const lineNumHi = (i >> 8) & 0xFF;
+      const lineNumLo = i & 0xFF;
+      await send(0x83, [lineNumHi, lineNumLo, ...lines[i]]);
+
+      if (onProgress) onProgress(Math.round((i + 1) / lines.length * 100));
+
+      // Throttle: evita overflow no buffer BLE (~20ms por linha)
+      if (i % 5 === 4) await sleep(20);
+    }
+
+    // CMD 0xE3: finalizar impressão
+    await send(0xE3, []);
+    await sleep(300);
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  return { connect, disconnect, printCanvas };
+})();
+
+// ─── Renderiza uma etiqueta num canvas offscreen ──────────
+async function renderLabelToCanvas(peca, sizeObj) {
+  // Resolução: 8 px/mm para boa qualidade na Niimbot B1 (203 DPI ≈ 8 px/mm)
+  const DPmm = 8;
+  const W = Math.round(sizeObj.w * DPmm);
+  const H = Math.round(sizeObj.h * DPmm);
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Fundo branco
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000000';
+
+  const pad = 4;
+  let y = pad;
+
+  // Veículo + Ano
+  const titleFontSize = Math.max(10, Math.round(H * 0.18));
+  ctx.font = `bold ${titleFontSize}px Arial, sans-serif`;
+  ctx.fillText(
+    ((peca.veiculo || 'JM Autopeças') + ' ' + (peca.ano || '')).trim().substring(0, 28),
+    pad, y + titleFontSize
+  );
+  y += titleFontSize + 3;
+
+  // Nome da peça
+  const pecaFontSize = Math.max(8, Math.round(H * 0.13));
+  ctx.font = `${pecaFontSize}px Arial, sans-serif`;
+  ctx.fillStyle = '#333333';
+  ctx.fillText(
+    (peca.peca || '') + (peca.lado ? ' — ' + peca.lado : ''),
+    pad, y + pecaFontSize
+  );
+  y += pecaFontSize + 2;
+
+  // Info adicional
+  const infoFontSize = Math.max(7, Math.round(H * 0.10));
+  ctx.font = `${infoFontSize}px Arial, sans-serif`;
+  ctx.fillStyle = '#666666';
+  const infoLine = [peca.sistema, peca.estado].filter(Boolean).join(' · ');
+  if (infoLine) {
+    ctx.fillText(infoLine, pad, y + infoFontSize);
+    y += infoFontSize + 2;
+  }
+
+  // Preço
+  const precoFontSize = Math.max(12, Math.round(H * 0.22));
+  ctx.font = `bold ${precoFontSize}px Arial, sans-serif`;
+  ctx.fillStyle = '#000000';
+  const precoTxt = peca.preco > 0
+    ? 'R$ ' + peca.preco.toFixed(2).replace('.', ',')
+    : '';
+  if (precoTxt) {
+    ctx.fillText(precoTxt, pad, y + precoFontSize);
+    y += precoFontSize + 2;
+  }
+
+  // Código de barras (se couber)
+  if (sizeObj.h >= 22 && document.getElementById('label-barcode').checked) {
+    const bcH = Math.max(18, Math.round((H - y - pad) * 0.85));
+    if (bcH > 10 && y + bcH + pad < H) {
+      try {
+        const bcCanvas = document.createElement('canvas');
+        JsBarcode(bcCanvas, codigoBarras(peca), {
+          format: 'CODE128',
+          width: 1.5,
+          height: bcH,
+          displayValue: true,
+          fontSize: Math.max(7, Math.round(bcH * 0.18)),
+          margin: 0,
+          textMargin: 1,
+          background: '#ffffff',
+          lineColor: '#000000',
+        });
+        // Escala o barcode para caber na largura
+        const scaleX = (W - pad * 2) / bcCanvas.width;
+        ctx.drawImage(bcCanvas, pad, y, bcCanvas.width * scaleX, bcH);
+      } catch(e) { /* ignorar erro de barcode */ }
+    }
+  }
+
+  return canvas;
+}
+
+// ─── Função principal: botão "Niimbot B1" ─────────────────
+async function niimbotPrint() {
+  if (!navigator.bluetooth) {
+    toast('Seu navegador não suporta Web Bluetooth. Use Chrome no desktop ou Android.', 'var(--red)');
+    return;
+  }
+
+  labelPecas = pecas.filter(p => selectedIds.has(p.id));
+  if (labelPecas.length === 0) {
+    toast('Nenhuma peça selecionada.', 'var(--amber)');
+    return;
+  }
+
+  const copies = Math.max(1, parseInt(document.getElementById('label-copies').value) || 1);
+  const size   = LABEL_SIZES[currentLabelSize];
+  const statusEl = document.getElementById('niimbot-status');
+  const statusTxt = document.getElementById('niimbot-status-text');
+  const progressBar = document.getElementById('niimbot-progress-bar');
+  const progressFill = document.getElementById('niimbot-progress-fill');
+  const btn = document.getElementById('btn-niimbot');
+
+  const setStatus = (msg, showBar = false) => {
+    statusEl.style.display = 'block';
+    statusTxt.textContent = msg;
+    progressBar.style.display = showBar ? 'block' : 'none';
+  };
+
+  btn.disabled = true;
+  try {
+    setStatus('🔵 Procurando Niimbot B1… Selecione o dispositivo na janela do navegador.');
+    const devName = await NIIMBOT.connect();
+    setStatus(`✅ Conectado a: ${devName}. Preparando etiquetas…`);
+
+    const total = labelPecas.length;
+    for (let i = 0; i < total; i++) {
+      const p = labelPecas[i];
+      setStatus(`🖨️ Imprimindo etiqueta ${i + 1} de ${total}: ${p.peca}…`, true);
+
+      const canvas = await renderLabelToCanvas(p, size);
+
+      await NIIMBOT.printCanvas(canvas, copies, (pct) => {
+        progressFill.style.width = pct + '%';
+      });
+
+      progressFill.style.width = '100%';
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    setStatus(`✅ Impressão concluída! ${total} etiqueta(s) enviada(s).`);
+    toast(`${total} etiqueta(s) impressas na Niimbot B1!`, 'var(--green)');
+    NIIMBOT.disconnect();
+  } catch (err) {
+    if (err.name === 'NotFoundError' || err.message?.includes('cancelled')) {
+      setStatus('❌ Conexão cancelada pelo usuário.');
+    } else {
+      setStatus('❌ Erro: ' + err.message);
+      toast('Erro Niimbot: ' + err.message, 'var(--red)');
+      console.error('Niimbot erro:', err);
+    }
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { statusEl.style.display = 'none'; }, 8000);
+  }
+}
 </script>
 </body>
 </html>
