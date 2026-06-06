@@ -1132,7 +1132,8 @@ const NIIMBOT = (() => {
   async function connect() {
     device = await navigator.bluetooth.requestDevice({
       filters: [
-        { namePrefix: 'B1' },
+        { name: 'B1-HC25130500' },   // seu dispositivo exato
+        { namePrefix: 'B1-' },       // outras unidades B1
         { namePrefix: 'D11' },
         { namePrefix: 'Niimbot' },
       ],
